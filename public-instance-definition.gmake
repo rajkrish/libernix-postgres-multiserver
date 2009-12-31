@@ -1,0 +1,436 @@
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# postgres-<instance>	This is the init script for starting up the PostgreSQL server
+#
+# chkconfig: - 64 36
+# description: Starts and stops the PostgreSQL backend daemon that handles  all database requests.
+# processname: postmaster
+#
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+# instance-name either comes from the symlink (init) or from the command line 'instance-title' argument ...
+instance-param-name											=	$(strip $(if	$(filter $(system-sym-true),$(system-exec-symlink-check)),	\
+																				$(system-exec-instance-name), 								\
+																				$(word 1, $(subst -, ,$(instance-param-title)))))
+
+instance-task-title											=	$(@)
+instance-task-verb											=	$(word 1, $(subst -, ,$(instance-task-title)))
+instance-task-noun1											=	$(word 2, $(subst -, ,$(instance-task-title)))
+instance-task-noun2											=	$(word 3, $(subst -, ,$(instance-task-title)))
+instance-task-noun3											=	$(word 4, $(subst -, ,$(instance-task-title)))
+
+
+# -------------------------------------------------------------------------------------------
+instance-dir-name											=	instance-$(instance-name)
+instance-dir												=	$(project-dir)/instance-$(instance-param-name)
+instance-global-tablespace-name								=	tablespace-GLOBAL
+instance-global-tablespace-dir								=	$(instance-dir)/$(instance-global-tablespace-name)
+instance-log-dir											=	$(instance-dir)/log
+instance-run-dir											=	$(instance-dir)/run
+instance-password-path										=	$(instance-run-dir)/instance-$(instance-param-name)-password.txt
+instance-initdb-log-path									=	$(instance-log-dir)/instance-$(instance-param-name)-initdb.log
+
+instance-pgversion-path										=	$(instance-global-tablespace-dir)/PG_VERSION
+instance-postgresqlconf-path								=	$(instance-global-tablespace-dir)/postgresql.conf
+instance-pghbaconf-path										=	$(instance-global-tablespace-dir)/pg_hba.conf
+instance-pgidentconf-path									=	$(instance-global-tablespace-dir)/pg_ident.conf
+
+instance-symlink-name										=	postgres-$(instance-param-name)
+instance-symlink-path										=	$(system-initd-dir)/$(instance-symlink-name)
+
+
+# -------------------------------------------------------------------------------------------
+instance-task-system-wlist									=	help debug
+
+instance-task-service-wlist									=	start stop restart condrestart status reload 
+
+instance-task-instance-wlist								=	create register unregister list
+
+instance-task-language-wlist								=	create drop list
+
+instance-task-role-wlist									=	create drop list
+
+instance-task-tablespace-wlist								=	create drop list
+
+instance-task-database-wlist								=	create drop list
+
+instance-task-schema-wlist									=	create drop list
+
+# TODO:  get this category list automatically ...
+instance-task-category-wlist								=	system service instance language role tablespace database schema
+func-task-category-name										=	$(strip $(1))
+instance-task-qualified1-wlist								=	$(foreach verb, $(instance-task-$(func-task-category-name)-wlist), $(verb)-$(func-task-category-name))
+
+# -------------------------------------------------------------------------------------------
+func-psql-sql-statement										=	$(strip $(1))
+instance-psql-internal-sh									=	$(system-cmd-psql) -d "user='$(project-service-login-name)' password='$(user-instance--$(instance-param-name)--admin-password)' host='$(user-localhost-name)' port=$(user-instance--$(instance-param-name)--port)" 	\
+																	-P format=unaligned -t -c "$(func-psql-sql-statement) ;" 2>/dev/null
+instance-psql-external-sh									=	$(system-cmd-psql) -d "user='$(project-service-login-name)' password='$(user-instance--$(instance-param-name)--admin-password)' host='$(user-localhost-name)' port=$(user-instance--$(instance-param-name)--port)" 	\
+																	-P format=aligned  -c "$(func-psql-sql-statement) ;"
+
+# -------------------------------------------------------------------------------------------
+instance-param-name-isvalid									=	$(strip	$(if $(instance-param-name), $(system-sym-true), $(system-sym-false)))
+instance-exists												=	$(shell [ -f $(instance-pgversion-path) ] && $(system-cmd-echo) $(system-sym-true) || $(system-cmd-echo) $(system-sym-false))
+instance-running											=	$(shell $(call project-pgctl-sh, status, ) &>/dev/null && echo $(system-sym-true) || echo $(system-sym-false) )
+
+instance-param-language-isvalid								=	$(strip	$(if $(instance-param--$(instance-task-title)--language), $(system-sym-true), $(system-sym-false)))
+instance-param-role-isvalid									=	$(strip	$(if $(instance-param--$(instance-task-title)--role), $(system-sym-true), $(system-sym-false)))
+instance-param-tablespace-isvalid							=	$(strip	$(if $(instance-param--$(instance-task-title)--tablespace), $(system-sym-true), $(system-sym-false)))
+instance-param-database-isvalid								=	$(strip	$(if $(instance-param--$(instance-task-title)--database), $(system-sym-true), $(system-sym-false)))
+instance-param-schema-isvalid								=	$(strip	$(if $(instance-param--$(instance-task-title)--schema), $(system-sym-true), $(system-sym-false)))
+
+instance-param-language-sql-statement						=	select lanname from pg_catalog.pg_language where lanname = '$(instance-param--$(instance-task-title)--language)'
+instance-param-language-sql-result							=	$(shell $(call instance-psql-internal-sh, $(instance-param-language-sql-statement)))
+instance-param-language-exists								=	$(strip $(if $(instance-param-language-sql-result), $(system-sym-true), $(system-sym-false)))
+
+instance-param-role-sql-statement							=	select usename from pg_catalog.pg_user where usename = '$(instance-param--$(instance-task-title)--role)'
+instance-param-role-sql-result								=	$(shell $(call instance-psql-internal-sh, $(instance-param-role-sql-statement)))
+instance-param-role-exists									=	$(strip $(if $(instance-param-role-sql-result), $(system-sym-true), $(system-sym-false)))
+
+instance-param-tablespace-sql-statement						=	select spcname from pg_catalog.pg_tablespace where spcname = '$(instance-param--$(instance-task-title)--tablespace)'
+instance-param-tablespace-sql-result						=	$(shell $(call instance-psql-internal-sh, $(instance-param-tablespace-sql-statement)))
+instance-param-tablespace-exists							=	$(strip $(if $(instance-param-tablespace-sql-result), $(system-sym-true), $(system-sym-false)))
+
+instance-param-database-sql-statement						=	select datname from pg_catalog.pg_database where datname = '$(instance-param--$(instance-task-title)--database)'
+instance-param-database-sql-result							=	$(shell $(call instance-psql-internal-sh, $(instance-param-database-sql-statement)))
+instance-param-database-exists								=	$(strip $(if $(instance-param-database-sql-result), $(system-sym-true), $(system-sym-false)))
+
+# TODO check the sql for schema 
+instance-param-schema-sql-statement							=	use $(instance-param--$(instance-task-title)--database) ; select scmname from pg_catalog.pg_schema where scmname = '$(instance-param--$(instance-task-title)--schema)'
+instance-param-schema-sql-result							=	$(shell $(call instance-psql-internal-sh, $(instance-param-schema-sql-statement)))
+instance-param-schema-exists								=	$(strip $(if $(instance-param-schema-sql-result), $(system-sym-true), $(system-sym-false)))
+
+
+# ---------------------------------------------------------------------------------
+func-language-name									=	$(strip $(1))
+instance-psql-select-language						=	$(call instance-psql-internal-sh, select lanname from pg_language where lanname = '$(func-language-name)')
+instance-psql-select-language-value					=	$(shell $(instance-psql-select-language) 2>/dev/null )
+instance-psql-select-language-exists				=	$(shell [ ! -z $(instance-psql-select-language-value) ] && $(system-cmd-echo) $(system-sym-true) || $(system-cmd-echo) $(system-sym-false) )
+instance-psql-create-language						=	$(call instance-psql-internal-sh, create language $(func-language-name))
+
+
+# -------------------------------------------------------------------------------------------
+instance-print-message-executing-task-sh			=	$(call system-print-message-sh, TASK, Executing '$(instance-task-title)' ...)
+
+# -------------------------------------------------------------------------------------------
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-instance--reference-sh
+	[ $(instance-param-name-isvalid) == $(system-sym-true) ] 					\
+		|| $(call system-print-error-sh, $(system-error-code-validation), The instance name provided is invalid.  Either provide 'instance-param-title' argument on the command line$(system-sym-comma) or execute this script from an registered symlink.  Please execute 'help' command for further information.)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-instance--referend-sh
+	[ $(instance-exists) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The instance name provided = '$(instance-param-name)' does not exist under '$(instance-dir)' directory on the filesystem.  Please create the specified instance and try again.) 
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-instance--running-sh
+	[ $(instance-running) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The instance '$(instance-param-name)' does not seem to be running. Please start the instance and try again.) 
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-language--reference-sh
+	[ $(instance-param-language-isvalid) == $(system-sym-true) ]
+		||	$(call system-print-error-sh, $(system-error-code-validation), The language  provided is invalid.  Please execute 'help' command for further information.)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-language--referend-sh
+	[ $(instance-exists) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The language name provided = '$(instance-param--$(instance-task-title)--language)' does not exist.  The language needs to be created in the system before proceeding any further.  See 'help' task for more information.) 
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-role--reference-sh
+	[ $(instance-param-role-isvalid) == $(system-sym-true) ]
+		||	$(call system-print-error-sh, $(system-error-code-validation), The role name provided is invalid.  Please execute 'help' command for further information.)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-role--referend-sh
+	[ $(instance-exists) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The role name provided = '$(instance-param--$(instance-task-title)--role)' does not exist.  Either start the server, or the role needs to be created before proceeding.  See 'help' task for more information.) 
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-tablespace--reference-sh
+	[ $(instance-param-tablespace-isvalid) == $(system-sym-true) ]
+		||	$(call system-print-error-sh, $(system-error-code-validation), The tablespace name provided is invalid.  Please execute 'help' command for further information.)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-tablespace--referend-sh
+	[ $(instance-exists) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The tablespace name provided = '$(instance-param--$(instance-task-title)--tablespace)' does not exist.  Either start the server, or the tablespace needs to be created before proceeding.  See 'help' task for more information.) 
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-database--reference-sh
+	[ $(instance-param-database-isvalid) == $(system-sym-true) ]
+		||	$(call system-print-error-sh, $(system-error-code-validation), The database name provided is invalid.  Please execute 'help' command for further information.)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-database--referend-sh
+	[ $(instance-exists) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The database name provided = '$(instance-param--$(instance-task-title)--database)' does not exist.  Either start the server, or the database needs to be created before proceeding.  See 'help' task for more information.) 
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-schema--reference-sh
+	[ $(instance-param-schema-isvalid) == $(system-sym-true) ]
+		||	$(call system-print-error-sh, $(system-error-code-validation), The schema name provided is invalid.  Please execute 'help' command for further information.)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-precondition--assert-schema--referend-sh
+	[ $(instance-exists) == $(system-sym-true) ] 					\
+		||	$(call system-print-error-sh, $(system-error-code-validation), The schema name provided = '$(instance-param--$(instance-task-title)--schema)' does not exist.  Either start the server, or the schema needs to be created before proceeding.  See 'help' task for more information.) 
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--help-system--description						=	Show this message.
+# instance-task--help-system--depend-extern					=	
+# instance-task--help-system--depend-intern					=	
+
+# NOTE:  The empty line before endef is mandatory ...
+func-task--help--print-symlink								=	$(strip $(1))
+func-task--help--print-category								=	$(strip $(2))
+func-task--help--print-verb									=	$(strip $(3))
+func-task--help--print-instance-name						=	$(strip $(if $(instance-param-name), $(instance-param-name), INSTANCE))
+define instance-task--help--print-sh
+	[ ! $(func-task--help--print-symlink) == $(system-sym-true) ] 		\
+		||	$(call system-print-message-sh, COMMAND, $(system-initd-dir)/postgres-$(func-task--help--print-instance-name)  $(func-task--help--print-verb))  
+	[ ! $(func-task--help--print-symlink) == $(system-sym-true) ] 		\
+		||	$(call system-print-message-sh, COMMAND, $(system-initd-dir)/postgres-$(func-task--help--print-instance-name)  $(func-task--help--print-verb)-$(func-task--help--print-category))   
+	$(call system-print-message-sh, COMMAND, $(system-cmd-gmake) -srRf $(system-exec-path)  $(instance-task--$(func-task--help--print-verb)-$(func-task--help--print-category)--require)  $(func-task--help--print-verb)-$(func-task--help--print-category))  
+	$(call system-print-message-sh, DESCRIPTION, $(instance-task--$(func-task--help--print-verb)-$(func-task--help--print-category)--description))
+	$(system-cmd-echo)
+
+endef
+
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--help-system--sh
+	$(system-cmd-echo)
+	$(call system-print-message-sh, INFO, The scripts in this project enables one to create multiple independent isolated instances of PostGreSQL server.)
+	$(call system-print-message-sh, INFO, The various tasks that are available are described below.  )
+	$(call system-print-message-sh, INFO, Replace the words INSTANCE$(system-sym-comma) TABLESPACE$(system-sym-comma) DATABASE$(system-sym-comma) SCHEMA and ROLE as appropriate.)
+
+	$(system-cmd-echo)
+	$(foreach verb, $(instance-task-system-wlist), $(call instance-task--help--print-sh, $(system-sym-true), system, $(verb)))
+	$(foreach verb, $(instance-task-service-wlist), $(call instance-task--help--print-sh, $(system-sym-true), service, $(verb)))
+	$(foreach verb, $(instance-task-instance-wlist), $(call instance-task--help--print-sh, $(system-sym-false), instance, $(verb)))
+	$(foreach verb, $(instance-task-language-wlist), $(call instance-task--help--print-sh, $(system-sym-false), language, $(verb)))
+	$(foreach verb, $(instance-task-role-wlist), $(call instance-task--help--print-sh, $(system-sym-false), role, $(verb)))
+	$(foreach verb, $(instance-task-tablespace-wlist), $(call instance-task--help--print-sh, $(system-sym-false), tablespace, $(verb)))
+	$(foreach verb, $(instance-task-database-wlist), $(call instance-task--help--print-sh, $(system-sym-false), database, $(verb)))
+	$(foreach verb, $(instance-task-schema-wlist), $(call instance-task--help--print-sh, $(system-sym-false), schema, $(verb)))
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--debug-system--description						=	Display debug information, e.g. system defined variables etc.
+# instance-task--debug-system--depend-extern					=	
+# instance-task--debug-system--depend-intern					=	
+# NOTE:  The empty line before endef is mandatory ...
+##	$(system-cmd-echo) "'instance-psql-select-language plpgsql'  = $(call instance-psql-select-language, plpgsql)"
+define instance-task--debug-system--sh
+	$(system-cmd-echo) $(call instance-task-qualified1-wlist, service)
+	$(system-cmd-echo) "'instance-param-title' = '$(instance-param-title)'"
+	$(system-cmd-echo) "'instance-param-name' = '$(instance-param-name)'"
+	$(system-cmd-echo) "'instance-running' = '$(instance-running)'"
+	$(system-cmd-echo) "'instance-psql-select-language-value plpgsql'  = $(call instance-psql-select-language-value, plpgsql)"
+	$(system-cmd-echo) "'instance-psql-select-language-exists plpgsql'  = $(call instance-psql-select-language-exists, plpgsql)"
+
+endef
+
+# -------------------------------------------------------------------------------------------
+# service tasks ...
+instance-task--start-service--description					=	Start the specified instance of PostgreSQL server.
+# instance-task--start-service--pgctl-argument				=	
+
+
+instance-task--stop-service--description					=	Stop the specified instance of PostgreSQL server.
+instance-task--stop-service--pgctl-argument					=	-m fast
+
+instance-task--restart-service--description					=	Restart the specified instance of PostgreSQL server.
+instance-task--restart-service--pgctl-argument				=	-m fast
+
+instance-task--condrestart-service--description				=	Conditionally restart the specified instance of PostgreSQL server.
+instance-task--condrestart-service--pgctl-argument			=	-m fast
+
+instance-task--status-service--description					=	Display the status for the specified instance of PostgreSQL server.
+# instance-task--status-service--pgctl-argument				=	
+
+instance-task--reload-service--description					=	Reload configuration for the specified instance of PostgreSQL server.
+# instance-task--reload-service--pgctl-argument				=	
+
+# -------------------------------------------------------------------------------------------
+# instance related tasks...
+
+instance-task--create-instance--description					=	Create an instance of PostgreSQL server with the specified instance name.
+instance-task--create-instance--require						=	instance-param-title=INSTANCE
+instance-task--create-instance--depend-extern				=	
+instance-task--create-instance--depend-intern				=	create-instance-pretask $(instance-pgversion-path)
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--create-instance--sh
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--register-instance--description				=	Register the PostgreSQL server instance with the operating system startup subsystem.
+instance-task--register-instance--require					=	instance-param-title=INSTANCE
+# instance-task--register-instance--depend-extern				=	
+# instance-task--register-instance--depend-intern				=	
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--register-instance--sh
+	$(system-cmd-ln) -sf "$(system-script-path)" "$(instance-symlink-path)"
+	$(system-cmd-chkconfig) --add "$(instance-symlink-name)"
+	$(system-cmd-chkconfig) "$(instance-symlink-name)" on
+	$(system-cmd-echo)
+	$(system-cmd-ls) -l --color=auto "$(instance-symlink-path)"
+	$(system-cmd-chkconfig) --list "$(instance-symlink-name)"
+	$(system-cmd-echo)
+
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--unregister-instance--description				=	Unregister the PostgreSQL server instance from the operating system startup subsystem.
+instance-task--unregister-instance--require					=	instance-param-title=INSTANCE
+# instance-task--unregister-instance--depend-extern			=	
+# instance-task--unregister-instance--depend-intern			=	
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--unregister-instance--sh
+	[ ! -L "$(instance-symlink-path)" ]	|| $(system-cmd-chkconfig) "$(instance-symlink-name)" off
+	[ ! -L "$(instance-symlink-path)" ]	|| $(system-cmd-chkconfig) --del "$(instance-symlink-name)"
+	[ ! -L "$(instance-symlink-path)" ]	|| $(system-cmd-rm) -rf "$(instance-symlink-path)"
+
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--list-instance--description					=	List all the available PostgreSQL server instances.
+instance-task--list-instance--require						=	
+# instance-task--list-instance--depend-extern					=	
+# instance-task--list-instance--depend-intern					=	
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--list-instance--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--create-language--description					=	Create a procedural language for the PostgreSQL server instance.
+instance-task--create-language--require						=	instance-param-title=INSTANCE-LANGUAGE
+# instance-task--unregister-instance--depend-extern			=	
+# instance-task--unregister-instance--depend-intern			=	
+
+# 	[  $(call instance-psql-select-language-exists, plpgsql) !=  $(system-sym-true) ] 	\
+# 		||  $(call system-print-message-sh, INFO, The specified language '$(instance-task--create-language--language)' already exists.)
+# 	[  $(call instance-psql-select-language-exists, plpgsql) ==  $(system-sym-true) ] 	\
+# 		||  $(call instance-psql-create-language, $(instance-task--create-language--language))
+
+# NOTE:  The empty line before endef is mandatory ...
+instance-param--create-language--language					=	$(word 2, $(subst -, ,$(instance-param-title)))
+define instance-task--create-language--sh
+	$(instance-precondition--assert-language--reference-sh)
+	[ $(instance-param-language-exists) != $(system-sym-true) ] 	\
+		|| $(call system-print-message-sh, INFO, The specified language '$(instance-param--$(instance-task-title)--language)' is already defined for this PostgreSQL server instance.)
+	[ $(instance-param-language-exists) == $(system-sym-true) ] 	\
+ 		||  $(call instance-psql-create-language, $(instance-task--$(instance-task-title)--language))
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--drop-language--description					=	Delete the specified procedural langugage from the PostgreSQL server instance.
+instance-task--drop-language--require						=	instance-param-title=INSTANCE-LANGUAGE
+# instance-task--list-instance--depend-extern					=	
+# instance-task--list-instance--depend-intern					=	
+# NOTE:  The empty line before endef is mandatory ...
+define instance-drop--list-language--sh
+	$(system-print-error-not-implemented-sh)
+
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--list-language--description					=	List all the installed procedural langugages in the PostgreSQL server instance.
+instance-task--list-language--require						=	instance-param-title=INSTANCE
+# instance-task--list-instance--depend-extern					=	
+# instance-task--list-instance--depend-intern					=	
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--list-language--sh
+	$(system-print-error-not-implemented-sh)
+
+
+endef
+
+# -------------------------------------------------------------------------------------------
+instance-task--create-role--description						=	Create a role (database user account) within a running PostgreSQL server instance.
+instance-task--create-role--require							=	instance-param-title=INSTANCE-ROLE
+
+instance-task--drop-role--description						=	Delete a role (database user account) from a running PostgreSQL server instance.
+instance-task--drop-role--require							=	instance-param-title=INSTANCE-ROLE
+
+instance-task--list-role--description						=	List all roles (database user accounts) in a running PostgreSQL server instance.
+instance-task--list-role--require							=	instance-param-title=INSTANCE
+
+# -------------------------------------------------------------------------------------------
+instance-task--create-tablespace--description				=	Create a tablespace within a running PostgreSQL server instance.
+instance-task--create-tablespace--require					=	instance-param-title=INSTANCE-ROLE-TABLESPACE
+
+instance-task--drop-tablespace--description					=	Delete a tablespace from a running PostgreSQL server instance.
+instance-task--drop-tablespace--require						=	instance-param-title=INSTANCE-TABLESPACE
+
+instance-task--list-tablespace--description					=	List all tablespaces in a running PostgreSQL server instance.
+instance-task--list-tablespace--require						=	instance-param-title=INSTANCE
+
+# -------------------------------------------------------------------------------------------
+instance-task--create-database--description					=	Create a database within a running PostgreSQL server instance.
+instance-task--create-database--require						=	instance-param-title=INSTANCE-ROLE-TABLESPACE-DATABASE
+
+instance-task--drop-database--description					=	Delete a database from a running PostgreSQL server instance.
+instance-task--drop-database--require						=	instance-param-title=INSTANCE-DATABASE
+
+instance-task--list-database--description					=	List all databases in a running PostgreSQL server instance.
+instance-task--list-database--require						=	instance-param-title=INSTANCE
+
+# -------------------------------------------------------------------------------------------
+instance-task--create-schema--description					=	Create a schema within a running PostgreSQL server instance.
+instance-task--create-schema--require						=	instance-param-title=INSTANCE-ROLE-DATABASE-SCHEMA
+
+instance-task--drop-schema--description						=	Delete a schema from a running PostgreSQL server instance.
+instance-task--drop-schema--require							=	instance-param-title=INSTANCE-SCHEMA
+
+instance-task--list-schema--description						=	List all schema in a running PostgreSQL server instance.
+instance-task--list-schema--require							=	instance-param-title=INSTANCE
+
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+
+
+

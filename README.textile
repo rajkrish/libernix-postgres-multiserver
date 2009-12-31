@@ -1,0 +1,80 @@
+
+h1.  Description
+
+This project provides GNU/make scripts that allows creation of multiple, isolated, independent, named instances of PostgreSQL servers running simultaneously on the same machine.
+
+h1.  Requirements
+
+The following are required to be pre-installed on the host machine (server) :
+
+*  PostgreSQL server package
+*  GNU/make (gmake) executable
+*  PSql client (optional)
+
+
+h1.  Configuration
+
+As the @root@ user on a Linux/Unix machine, perform the following steps as root user (unless another user account is specified) :
+
+h4.  Choose a base directory
+
+A base directory to host the contents of this project, which would in turn, contain all the data files from all the independent Postgres server instances.  Hence it would be advisable to choose the base directory to be a mounted hard disk partition specially chosen for this purpose.  The following description would use /mnt/sdb4 as the base directory, which corresponds to the actual physical hard disk partition /dev/sdb4 in the system.
+
+h4.  Fetch the source
+
+Execute the following commands as root:
+
+<pre>
+#  cd /mnt/sdb4
+#  git clone git@git.github.com:rajkrish/libernix-postgres-multiserver.git
+#  cd libernix-postgres-multiserver
+</pre>
+
+h4.  Copy the file @public-user-definition.gmake.example@ to @public-user-definition.gmake@ :
+
+<pre>
+#  cp public-user-definition.gmake.example private-user-definition.gmake 
+</pre>
+
+The default configuration contains descriptions for 2 named server instances @production@ and @development@.  You could choose to define as many others as you like following the examples therein.  Note that just defining another server instance does not automatically create that instance.  You would need to manually create that instance for it to be useful (this is just a one time operation).  The main  script you would exercise with the @/usr/bin/gmake@ command is @public-project-main.gmake@.
+
+h4.  Look at the help for the project
+
+<pre>
+#  gmake -srRf public-project-main.gmake help
+</pre>
+
+The output would print a long list of available actions that you could choose to perform, their dependencies (if any), and any extra command line arguments as may be required.
+
+Let us initialize the @development@ instance first.
+
+h4. Inspect the @development@ instance as follows:
+
+<pre>
+#   gmake -srRf public-project-main.gmake instance-title=development show-configuration
+</pre>
+
+If you are satisfied with the configuration parameters, then proceed further, else edit the @private-user-definition.gmake@ file and repeat above action.
+
+h4.  Create the instance
+
+<pre>
+#   gmake -srRf public-project-main.gmake instance-title=development create-instance
+</pre>
+
+This action would create an instance called @development@ along with the following filesystem components:
+* *Data:*  The instance data (tablespaces, configuration files etc.) would be located under @libernix-postgres-multiserver/data/development/@ directory.
+* *Log:*  The log files would be located under @libernix-postgres-multiserver/log/development/@ directory. The notable file at this point would be the creation log @development--create-instance.log@.
+*  *Configuration:*  The configuration files @postgresql.conf@, @pg_hba.conf@ and @pg_ident.conf@ would all be located under @libernix-postgres-multiserver/data/development/conf/@ directory.
+
+h4.  Start the instance
+
+<pre>
+#   gmake -srRf public-project-main.gmake instance-title=development start-instance
+</pre>
+
+
+
+
+
+

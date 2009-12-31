@@ -1,0 +1,40 @@
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# postgres-<instance>	This is the init script for starting up the PostgreSQL server
+#
+# chkconfig: - 64 36
+# description: Starts and stops the PostgreSQL backend daemon that handles  all database requests.
+# processname: postmaster
+#
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+project-keyword											=	postgres
+
+project-service-login-name								=	$(project-keyword)
+project-service-group-name								=	$(project-keyword)
+
+
+
+
+
+# ---------------------------------------------------------------------------------
+# pg_ctl wrapper ...
+func-pgctl-task											=	$(strip $(1))
+func-pgctl-argument										=	$(strip $(2))
+func-pgctl-sh											=	$(system-cmd-pgctl)	$(func-pgctl-task)				\
+																-w -D '$(instance-global-tablespace-dir)'		\
+																$(func-pgctl-argument)							\
+																-o '-p $(user-instance--$(instance-param-name)--port)'
+project-pgctl-sh										=	$(system-cmd-su)									\
+																-l	$(project-service-login-name) 				\
+																-c "$(func-pgctl-sh)"
+
+
+

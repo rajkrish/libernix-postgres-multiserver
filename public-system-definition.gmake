@@ -1,0 +1,114 @@
+
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# postgres-<instance>	This is the init script for starting up the PostgreSQL server
+#
+# chkconfig: - 64 36
+# description: Starts and stops the PostgreSQL backend daemon that handles  all database requests.
+# processname: postmaster
+#
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+
+# -------------------------------------------------------------------------------------------
+# symbols ...
+system-sym-tab					=	▶
+system-sym-newline				=	▼
+system-sym-empty				=	●
+
+system-sym-config				=	config
+system-sym-true					=	true
+system-sym-false				=	false
+system-sym-comma				=	,
+system-sym-pound				=	\#
+
+# -------------------------------------------------------------------------------------------
+#  shell executable commands ...
+system-cmd-which				=	/usr/bin/which
+system-cmd-mkdir				=	$(shell $(system-cmd-which) mkdir)
+system-cmd-touch				=	$(shell $(system-cmd-which) touch)
+system-cmd-echo					=	$(shell $(system-cmd-which) echo)
+system-cmd-tr					=	$(shell $(system-cmd-which) tr)
+system-cmd-mv					=	$(shell $(system-cmd-which) mv)
+system-cmd-printf				=	$(shell $(system-cmd-which) printf)
+system-cmd-gmake				=	$(shell $(system-cmd-which) gmake)
+system-cmd-cp					=	$(shell $(system-cmd-which) cp)
+system-cmd-grep					=	$(shell $(system-cmd-which) grep)
+system-cmd-sed					=	$(shell $(system-cmd-which) sed)
+system-cmd-chmod				=	$(shell $(system-cmd-which) chmod)
+system-cmd-chown				=	$(shell $(system-cmd-which) chown)
+system-cmd-readlink				=	$(shell $(system-cmd-which) readlink)
+system-cmd-dirname				=	$(shell $(system-cmd-which) dirname)
+system-cmd-basename				=	$(shell $(system-cmd-which) basename)
+system-cmd-rake					=	$(shell $(system-cmd-which) rake)
+system-cmd-chkconfig			=	$(shell $(system-cmd-which) chkconfig)
+system-cmd-groups				=	$(shell $(system-cmd-which) groups)
+system-cmd-cut					=	$(shell $(system-cmd-which) cut)
+system-cmd-svn					=	$(shell $(system-cmd-which) svn)
+system-cmd-git					=	$(shell $(system-cmd-which) git)
+system-cmd-kill					=	$(shell $(system-cmd-which) kill)
+system-cmd-cat					=	$(shell $(system-cmd-which) cat)
+system-cmd-rsync				=	$(shell $(system-cmd-which) rsync)
+system-cmd-su					=	$(shell $(system-cmd-which) su)
+system-cmd-rm					=	$(shell $(system-cmd-which) rm)
+system-cmd-ln					=	$(shell $(system-cmd-which) ln)
+system-cmd-tee					=	$(shell $(system-cmd-which) tee)
+system-cmd-ls					=	$(shell $(system-cmd-which) ls)
+
+
+system-cmd-initdb				=	$(shell $(system-cmd-which) initdb)
+system-cmd-pgctl				=	$(shell $(system-cmd-which) pg_ctl)
+system-cmd-psql					=	$(shell $(system-cmd-which) psql)
+
+system-cmd-cd					=	cd
+
+
+# the calling executable (maybe symlink) and actual invoked script variables ...
+system-exec-path				=	$(word 1, $(MAKEFILE_LIST))
+system-exec-dir					=	$(notdir $(system-exec-path))
+system-exec-file-name			=	$(shell $(system-cmd-basename) $(system-exec-path))
+system-exec-project-vendor		=	$(word 1, $(subst -, ,$(system-exec-file-name)))
+system-exec-instance-name		=	$(word 2, $(subst -, ,$(system-exec-file-name)))
+system-exec-symlink-check		=	$(shell [ -L "$(system-exec-path)" ] && $(system-cmd-echo) $(system-sym-true) || $(system-cmd-echo) $(system-sym-false) )
+system-exec-project-check		=	$(shell [ "$(system-exec-project-vendor)" == "$(project-vendor)" ] && $(system-cmd-echo) $(system-sym-true) || $(system-cmd-echo) $(system-sym-false) )
+
+system-script-path				=	$(shell $(system-cmd-readlink) -nf $(system-exec-path))
+system-script-dir				=	$(notdir $(system-script-path))
+system-script-file-name			=	$(shell $(system-cmd-basename) $(system-script-path))
+system-initd-dir				=	/etc/init.d
+
+# -------------------------------------------------------------------------------------------
+system-error-code-validation		=	4
+system-error-code-not-implemented	=	6
+
+system-print-message-header-width	=	12
+system-print-error-header-width		=	12
+
+# shell snippets
+func-print-message-header-text		=	$(strip $(1))
+func-print-message-body-text		=	$(2)
+
+system-print-message-sh				=	$(system-cmd-printf)									\
+											"%-$(system-print-message-header-width)s %s\\n" 	\
+											"$(func-print-message-header-text):" 				\
+											"$(func-print-message-body-text)"
+
+func-print-error-header-text		=	ERROR
+func-print-error-code				=	$(1)
+func-print-error-body-text			=	$(2)
+system-print-error-sh				=	(	$(system-cmd-printf)								\
+												"%-$(system-print-error-header-width)s %s\\n" 	\
+												"$(func-print-error-header-text):" 				\
+												"$(func-print-error-body-text)"					\
+												&& exit $(func-print-error-code) )
+
+
+system-print-error-not-implemented-sh		=	$(call system-print-error-sh, $(system-error-code-not-implemented), The task '$(instance-task-title)' has not yet been implemented.  Sorry.)
+
+

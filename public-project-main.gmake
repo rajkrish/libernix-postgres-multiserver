@@ -1,0 +1,38 @@
+#!/usr/bin/gmake -srRf 
+
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# postgres-<instance>	This is the init script for starting up the PostgreSQL server
+#
+# chkconfig: - 64 36
+# description: Starts and stops the PostgreSQL backend daemon that handles  all database requests.
+# processname: postmaster
+#
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+DEFAULT: help
+
+project-dir							=	$(shell dirname $(shell readlink -fn $(firstword $(MAKEFILE_LIST))))
+
+include								$(project-dir)/public-system-definition.gmake
+include								$(project-dir)/public-project-definition.gmake
+include								$(project-dir)/private-user-definition.gmake
+include								$(project-dir)/public-instance-definition.gmake
+
+# ---------------------------------------------------------------------------------
+
+
+
+
+# -------------------------------------------------------------------------------------------
+# include the system task definitions  ...
+include								$(project-dir)/public-instance-task.gmake
+
+
+

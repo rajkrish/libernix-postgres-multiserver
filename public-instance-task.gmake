@@ -1,0 +1,203 @@
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# postgres-<instance>	This is the init script for starting up the PostgreSQL server
+#
+# chkconfig: - 64 36
+# description: Starts and stops the PostgreSQL backend daemon that handles  all database requests.
+# processname: postmaster
+#
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+
+# 	$(system-cmd-echo)	"INFO:  Backing up $(func-actual-config-name).conf ..."
+
+
+# ---------------------------------------------------------------------------------
+# configuration handler ...
+func-actual-config-name				=	$(strip $(1))
+func-var-config-name				=	$(strip $(2))
+define instance-update-config-sh
+	$(system-cmd-echo)
+	$(system-cmd-mv)	"$(instance-$(func-var-config-name)conf-path)" "$(instance-$(func-var-config-name)conf-path).original1"
+	$(system-cmd-gmake) -srRnf $(project-dir)/public-project-template.gmake						\
+						instance-title=$(instance-title)										\
+						generate-template-$(func-var-config-name)conf							\
+						|	$(system-cmd-sed) -e 's/▶/\t/g' -e 's/▼/\n/g' -e 's/●//g'			\
+						>	$(instance-$(func-var-config-name)conf-path)
+	$(system-cmd-chown)	-R $(project-service-login-name):$(project-service-group-name)			\
+						$(instance-$(func-var-config-name)conf-path)
+	$(system-cmd-echo)	"INFO:  Updated '$(instance-$(func-var-config-name)conf-path)'."
+
+endef
+
+
+# ---------------------------------------------------------------------------------
+instance-pgversion-dir-wlist						=	'$(instance-dir)'							\
+														'$(instance-global-tablespace-dir)'			\
+														'$(instance-log-dir)'						\
+														'$(instance-run-dir)'
+
+instance-pgversion-path-wlist						=	'$(instance-password-path)'	'$(instance-initdb-log-path)'
+instance-pgversion-initdb-sh						=	$(system-cmd-initdb)	--pgdata='$(instance-global-tablespace-dir)'	\
+																			--pwfile='$(instance-password-path)'		\
+																			--auth='trust'
+
+# $(instance-pgversion-path): 
+# 	$(system-cmd-echo) "$(system-executing-info-sh)"
+#	$(system-cmd-echo)  "INFO:  Executing from with in $(instance-pgversion-path) ..."
+# 	$(call project--assert-instance--valid, instance-pgversion-path)
+#	(system-cmd-echo)  "INFO:  Executing from with in $(instance-pgversion-path) ..."
+
+
+create-instance-pretask:
+	[ ! -f $(instance-pgversion-path) ]  						\
+		|| $(call system-print-message-sh, INFO,  The specified instance '$(instance-param-name)' already exists at location '$(instance-dir)'.)
+
+# actual task that creates an instance ...
+$(instance-pgversion-path): 
+	$(instance-print-message-executing-task-sh)
+	$(system-cmd-mkdir) -p $(instance-pgversion-dir-wlist)
+	$(system-cmd-echo)	'$(user-instance--$(instance-param-name)--admin-password)' > '$(instance-password-path)'
+	$(system-cmd-touch)	"$(instance-initdb-log-path)"
+	$(system-cmd-chown)	-R $(project-service-login-name):$(project-service-group-name)	\
+						$(instance-pgversion-dir-wlist)								\
+						$(instance-pgversion-path-wlist)
+	$(system-cmd-echo)
+	$(system-cmd-su)	-l	$(project-service-login-name) 								\
+						-c	"$(instance-pgversion-initdb-sh)"							\
+						|	$(system-cmd-tee) "$(instance-initdb-log-path)"
+	$(system-cmd-echo)	"INFO:  Created instance '$(instance-param-name)' at location '$(instance-dir)'."
+	$(system-cmd-rm)	'$(instance-password-path)'
+
+	$(call instance-update-config-sh, postgresql, postgresql)
+	$(call instance-update-config-sh, pg_hba, pghba)
+	$(call instance-update-config-sh, pg_ident, pgident)
+
+
+
+
+.SECONDEXPANSION:
+
+# -------------------------------------------------------------------------------------------
+# Define all the basic system tasks ...
+ifneq ($(instance-task-system-wlist),)
+$(instance-task-system-wlist)  :	$$(@)-system
+
+endif
+
+# Define all the qualified system tasks ...
+ifneq ($(call instance-task-qualified1-wlist, system),)
+$(call instance-task-qualified1-wlist, system)  :						\
+		$$(instance-task--$(instance-task-title)--depend-extern)		\
+		$$(instance-task--$(instance-task-title)--depend-intern)
+	$(instance-print-message-executing-task-sh)
+	$(instance-task--$(instance-task-title)--sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the basic service tasks ...
+ifneq ($(instance-task-service-wlist),)
+$(instance-task-service-wlist)  :	$$(@)-service
+
+endif
+
+# Define all the qualified service tasks ...
+ifneq ($(call instance-task-qualified1-wlist, service),)
+$(call instance-task-qualified1-wlist, service)  :	
+	$(instance-print-message-executing-task-sh)
+	$(instance-precondition--assert-instance--reference-sh)
+	$(instance-precondition--assert-instance--referend-sh)
+	$(instance-task--$(instance-task-title)--pgctl-pretask-sh)
+	$(call project-pgctl-sh, $(instance-task-verb), $(instance-task--$(instance-task-title)--pgctl-argument))
+	$(instance-task--$(instance-task-title)--pgctl-posttask-sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the qualified instance tasks ...
+ifneq ($(call instance-task-qualified1-wlist, instance),)
+$(call instance-task-qualified1-wlist, instance)  :						\
+		$$(instance-task--$$(instance-task-title)--depend-extern)		\
+		$$(instance-task--$$(instance-task-title)--depend-intern)  
+	$(instance-precondition--assert-instance--reference-sh)
+	$(instance-task--$(instance-task-title)--sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the qualified instance tasks ...
+ifneq ($(call instance-task-qualified1-wlist, language),)
+$(call instance-task-qualified1-wlist, language)  :						\
+		$$(instance-task--$$(instance-task-title)--depend-extern)		\
+		$$(instance-task--$$(instance-task-title)--depend-intern)  
+	$(system-cmd-echo) "EXECUTING task '$(@)'  ...."
+	$(instance-precondition--assert-instance--reference-sh)
+	$(instance-precondition--assert-instance--referend-sh)
+	$(instance-precondition--assert-instance--running-sh)
+	$(instance-task--$(instance-task-title)--sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the qualified role tasks ...
+ifneq ($(call instance-task-qualified1-wlist, role),)
+$(call instance-task-qualified1-wlist, role)  :	
+	$(system-cmd-echo) "EXECUTING command '$(@)' ...."
+	$(instance-precondition--assert-instance-reference--sh)
+	$(instance-precondition--assert-instance-referend--sh)
+	$(instance-precondition--assert-instance--running-sh)
+	$(instance-precondition--assert-role-reference--sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the qualified tablespace tasks ...
+ifneq ($(call instance-task-qualified1-wlist, tablespace),)
+$(call instance-task-qualified1-wlist, tablespace)  :	
+	$(system-cmd-echo) "EXECUTING command '$(@)' ...."
+	$(instance-precondition--assert-instance-reference--sh)
+	$(instance-precondition--assert-instance-referend--sh)
+	$(instance-precondition--assert-role-reference--sh)
+	$(instance-precondition--assert-role-referend--sh)
+	$(instance-precondition--assert-tablespace-reference--sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the qualified database tasks ...
+ifneq ($(call instance-task-qualified1-wlist, database),)
+$(call instance-task-qualified1-wlist, database)  :	
+	$(system-cmd-echo) "EXECUTING command '$(@)' ...."
+	$(instance-precondition--assert-instance-reference--sh)
+	$(instance-precondition--assert-instance-referend--sh)
+	$(instance-precondition--assert-role-reference--sh)
+	$(instance-precondition--assert-role-referend--sh)
+	$(instance-precondition--assert-tablespace-reference--sh)
+	$(instance-precondition--assert-tablespace-referend--sh)
+	$(instance-precondition--assert-database-reference--sh)
+
+endif
+
+# -------------------------------------------------------------------------------------------
+# Define all the qualified schema tasks ...
+ifneq ($(call instance-task-qualified1-wlist, schema),)
+$(call instance-task-qualified1-wlist, schema)  :	
+	$(system-cmd-echo) "EXECUTING command '$(@)' ...."
+	$(instance-precondition--assert-instance-reference--sh)
+	$(instance-precondition--assert-instance-referend--sh)
+	$(instance-precondition--assert-role-reference--sh)
+	$(instance-precondition--assert-role-referend--sh)
+	$(instance-precondition--assert-database-reference--sh)
+	$(instance-precondition--assert-database-referend--sh)
+	$(instance-precondition--assert-schema-reference--sh)
+
+endif
+
+

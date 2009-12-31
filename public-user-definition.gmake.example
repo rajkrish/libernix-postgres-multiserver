@@ -1,0 +1,36 @@
+
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# postgres-<instance>	This is the init script for starting up the PostgreSQL server
+#
+# chkconfig: - 64 36
+# description: Starts and stops the PostgreSQL backend daemon that handles  all database requests.
+# processname: postmaster
+#
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+
+
+user-localhost-name											=	localhost
+# defina all the instance keys here, each one would be represented by a user-instance-key
+#user-instance-key-wlist										=	production development
+
+# for each of the instance key above, define the instance parameters ...
+user-instance--production--description						=	Production server instance
+user-instance--production--port								=	54320
+user-instance--production--admin-password					=	PRODUCTION
+
+# -------------------------------------------------------------------------------------------
+# for each of the instance key above, define the instance parameters ...
+user-instance--development--description						=	Development server instance
+user-instance--development--port							=	54321
+user-instance--development--admin-password					=	DEVELOPMENT
+
+
+
