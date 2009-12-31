@@ -14,23 +14,29 @@
 
 DEFAULT: help
 
-project-dir							=	$(shell dirname $(shell readlink -fn $(firstword $(MAKEFILE_LIST))))
+project-dir								=	$(shell dirname $(shell readlink -fn $(firstword $(MAKEFILE_LIST))))
 
-instance-name						=	development
-instance-dir						=	$(project-dir)/instance-$(instance-name)
-instance-tablespace-default-dir		=	$(instance-dir)/tablespace-GLOBAL
-instance-postmaster-pid-path		=	$(instance-tablespace-default-dir)/postmaster.pid
+instance-name							=	development
+instance-dir							=	$(project-dir)/instance-$(instance-name)
+instance-tablespace-default-dir			=	$(instance-dir)/tablespace-GLOBAL
+instance-postmaster-pid-path			=	$(instance-tablespace-default-dir)/postmaster.pid
+instance-private-user-definition-path	=	$(project-dir)/private-user-definition.gmake
 
-test-start-service:
+test-user-definition:
+	[ ! -f $(instance-private-user-definition-path) ] && echo "WARNING:  The default user definition file 'private-user-definition.gmake' was not found.  Copying over template from 'public-user-definition.gmake.example'..." || exit 0
+	[ ! -f $(instance-private-user-definition-path) ] && cp $(project-dir)/public-user-definition.gmake.example $(instance-private-user-definition-path)  || exit 0
+
+test-start-service: test-user-definition
 	[ -d $(project-dir)/instance-$(instance-name) ] && [ ! -f $(instance-postmaster-pid-path) ] && gmake -srRf $(project-dir)/public-project-main.gmake instance-param-title=$(instance-name)  start status  || exit 0
 
-test-stop-instance:
+test-stop-instance: test-user-definition
 	[ -f $(instance-postmaster-pid-path) ] && gmake -srRf $(project-dir)/public-project-main.gmake instance-param-title=$(instance-name) stop   || exit 0
 
 test-delete-instance: test-stop-instance
+	[ -d $(project-dir)/instance-$(instance-name) ] && echo "INFO:  Deleting directory '$(project-dir)/instance-$(instance-name)' ...." || exit 0
 	[ -d $(project-dir)/instance-$(instance-name) ] && rm -rf $(project-dir)/instance-$(instance-name)   || exit 0
 
-test-create-instance:
+test-create-instance:  test-user-definition
 	[ ! -d $(project-dir)/instance-$(instance-name) ] && gmake -srRf $(project-dir)/public-project-main.gmake instance-param-title=$(instance-name) create-instance   || exit 0
 
 test-recreate-instance: test-delete-instance test-create-instance
