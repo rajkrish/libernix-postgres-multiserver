@@ -1,0 +1,43 @@
+#!/usr/bin/gmake -srRf
+
+# -------------------------------------------------------------------------------------------
+#	Copyright (C)  Rajesh Krishnan (devel AT krishnan DOT cc).  All rights reserved.
+#	This code and the related module is released to the public under the GNU LGPL v3 License.
+# -------------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------------
+# Test script for the main project.
+# 
+# This script uses TABs for indentation and formatting. 
+#  Set TABSPACE=4 in your favorite editor to view the formatting correctly.
+# -------------------------------------------------------------------------------------------
+
+DEFAULT: help
+
+project-dir							=	$(shell dirname $(shell readlink -fn $(firstword $(MAKEFILE_LIST))))
+
+instance-name						=	development
+instance-dir						=	$(project-dir)/instance-$(instance-name)
+instance-tablespace-default-dir		=	$(instance-dir)/tablespace-GLOBAL
+instance-postmaster-pid-path		=	$(instance-tablespace-default-dir)/postmaster.pid
+
+test-start-service:
+	[ -d $(project-dir)/instance-$(instance-name) ] && [ ! -f $(instance-postmaster-pid-path) ] && gmake -srRf $(project-dir)/public-project-main.gmake instance-param-title=$(instance-name)  start status  || exit 0
+
+test-stop-instance:
+	[ -f $(instance-postmaster-pid-path) ] && gmake -srRf $(project-dir)/public-project-main.gmake instance-param-title=$(instance-name) stop   || exit 0
+
+test-delete-instance: test-stop-instance
+	[ -d $(project-dir)/instance-$(instance-name) ] && rm -rf $(project-dir)/instance-$(instance-name)   || exit 0
+
+test-create-instance:
+	[ ! -d $(project-dir)/instance-$(instance-name) ] && gmake -srRf $(project-dir)/public-project-main.gmake instance-param-title=$(instance-name) create-instance   || exit 0
+
+test-recreate-instance: test-delete-instance test-create-instance
+
+
+test-recycle-service: test-recreate-instance test-start-service
+
+test-create-user:
+	
+
