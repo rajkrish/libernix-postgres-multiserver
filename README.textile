@@ -442,4 +442,6 @@ h1.  Issue tracking:
 
 Please report all the bugs, issues & feature requests at the "GitHub issue tracking site":http://github.com/rajkrish/libernix-postgres-multiserver/issues .
 
+h1.  Related projects:
 
+* *libernix-mysql-multiserver* --  Manage multiple, isolated, named instances of MySQL running simultaneously on the same mcahine ( "URL":http://github.com/rajkrish/libernix-mysql-multiserver ).
