@@ -407,6 +407,29 @@ CREATE DATABASE
 
 </pre>
 
+h1.  License
 
+All the code for the project is released under the GNU LGPL v3 license.
+
+h1.  Test configuration
+
+The scripts in this project were tested on Fedora 12 x86_64 machine.
+
+The version of PostgreSQL used at the time of this writing was @postgresql-8.4.2-1.fc12.x86_64@ .
+
+The version fo GNU/make used is @make-3.81-18.fc12.x86_64@.
+
+h1.  Development status:
+
+There are numerous commands that are currently defined but when executed would return the following error:
+<pre>
+This command is not yet implemented.  Sorry.
+</pre>
+
+Those would be implemented at a future date, and/or as the development progresses.  
+
+h1.  Issue tracking:
+
+Please report all the bugs, issues & feature requests at the "GitHub issue tracking site":http://github.com/rajkrish/libernix-postgres-multiserver/issues .
 
 
