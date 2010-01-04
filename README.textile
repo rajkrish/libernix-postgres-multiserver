@@ -305,7 +305,11 @@ waiting for server to shut down.... done
 server stopped
 </pre>
 
-h4.  If you want this service to be started on bootup, you could register the service as follows:
+h4.  Register the server instance with the operating system:
+
+Note that this command requires @/sbin/chkconfig@ command line utility be available on your system.
+
+If you want this service to be started on bootup, you could register the service as follows:
 
 <pre>
 #   gmake -srRf  public-project-main.gmake instance-param-title=development   register-instance
@@ -320,7 +324,9 @@ postgres-development    0:off   1:off   2:on    3:on    4:on    5:on    6:off
 </pre>
 
 
-h4.  Note that once a service instance is registered with the system startup process, you could execute the simplified commands using the symbolic link from the @/etc/init.d/ folder.  For example, to start the registered service instance, simply execute:
+h4.  Simplified startup of registered instances
+
+Note that once a service instance is registered with the system startup process, you could execute the simplified commands using the symbolic link from the @/etc/init.d/ folder.  For example, to start the registered service instance, simply execute:
 
 <pre>
 #   /etc/init.d/postgres-development start
@@ -338,7 +344,11 @@ server started
 The same is true for other @service@ commands like @start@, @stop@, @restart@, @reload@, @status@ etc.
 
 
-h4.  You could unregister the service from the operating system's startup process as follows:
+h4.  Unregister a registered server instance 
+
+Note that this command requires @/sbin/chkconfig@ command line utility be available on your system.
+
+You could unregister the service from the operating system's startup process as follows:
 
 <ore>
 #   gmake -srRf  public-project-main.gmake instance-param-title=development   unregister-instance
