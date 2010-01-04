@@ -307,7 +307,7 @@ server stopped
 
 h4.  If you want this service to be started on bootup, you could register the service as follows:
 
-<ore>
+<pre>
 #   gmake -srRf  public-project-main.gmake instance-param-title=development   register-instance
 </pre>
 
