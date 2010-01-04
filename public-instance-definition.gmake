@@ -25,6 +25,10 @@ instance-task-noun1											=	$(word 2, $(subst -, ,$(instance-task-title)))
 instance-task-noun2											=	$(word 3, $(subst -, ,$(instance-task-title)))
 instance-task-noun3											=	$(word 4, $(subst -, ,$(instance-task-title)))
 
+instance-param-argument1									=	$(word 1, $(subst -, ,$(instance-param-title)))
+instance-param-argument2									=	$(word 2, $(subst -, ,$(instance-param-title)))
+instance-param-argument3									=	$(word 3, $(subst -, ,$(instance-param-title)))
+instance-param-argument4									=	$(word 4, $(subst -, ,$(instance-param-title)))
 
 # -------------------------------------------------------------------------------------------
 instance-dir-name											=	instance-$(instance-name)
@@ -50,7 +54,7 @@ instance-task-system-wlist									=	help debug
 
 instance-task-service-wlist									=	start stop restart condrestart status reload 
 
-instance-task-instance-wlist								=	create register unregister list
+instance-task-instance-wlist								=	create register unregister list showconfig
 
 instance-task-language-wlist								=	create drop list
 
@@ -61,6 +65,7 @@ instance-task-tablespace-wlist								=	create drop list
 instance-task-database-wlist								=	create drop list
 
 instance-task-schema-wlist									=	create drop list
+
 
 # TODO:  get this category list automatically ...
 instance-task-category-wlist								=	system service instance language role tablespace database schema
@@ -343,6 +348,24 @@ define instance-task--list-instance--sh
 endef
 
 # -------------------------------------------------------------------------------------------
+instance-task--showconfig-instance--description					=	Display the configuration for the specified instance.
+instance-task--showconfig-instance--require						=	instance-param-title=INSTANCE
+# instance-task--showconfig-instance--depend-extern					=	
+# instance-task--showconfig-instance--depend-intern					=	
+# NOTE:  The empty line before endef is mandatory ...
+define instance-task--showconfig-instance--sh
+	$(call system-print-message-sh, INFO, The system would use the following information for administering this instance:)
+	$(call system-print-variable-sh, project-dir)
+	$(call system-print-variable-sh, instance-param-title)
+	$(call system-print-variable-sh, instance-param-name)
+	$(call system-print-variable-sh, instance-dir)
+	$(call system-print-variable-sh, user-instance--$(instance-param-name)--port)
+	$(call system-print-variable-sh, user-instance--$(instance-param-name)--admin-password)
+	$(system-cmd-echo)
+
+endef
+
+# -------------------------------------------------------------------------------------------
 instance-task--create-language--description					=	Create a procedural language for the PostgreSQL server instance.
 instance-task--create-language--require						=	instance-param-title=INSTANCE-LANGUAGE
 # instance-task--unregister-instance--depend-extern			=	
@@ -352,15 +375,17 @@ instance-task--create-language--require						=	instance-param-title=INSTANCE-LAN
 # 		||  $(call system-print-message-sh, INFO, The specified language '$(instance-task--create-language--language)' already exists.)
 # 	[  $(call instance-psql-select-language-exists, plpgsql) ==  $(system-sym-true) ] 	\
 # 		||  $(call instance-psql-create-language, $(instance-task--create-language--language))
+# 	$(instance-precondition--assert-language--reference-sh)
+# 	[ $(instance-param-language-exists) != $(system-sym-true) ] 	\
+# 		|| $(call system-print-message-sh, INFO, The specified language '$(instance-param--$(instance-task-title)--language)' is already defined for this PostgreSQL server instance.)
+# 	[ $(instance-param-language-exists) == $(system-sym-true) ] 	\
+#  		||  $(call instance-psql-create-language, $(instance-task--$(instance-task-title)--language))
+instance-task--create-language--language					=	$(instance-param-argument2)
 
 # NOTE:  The empty line before endef is mandatory ...
-instance-param--create-language--language					=	$(word 2, $(subst -, ,$(instance-param-title)))
+instance-task--create-language--psql-sh						=	$(call instance-psql-internal-sh, create language $(instance-task--create-language--language) )
 define instance-task--create-language--sh
-	$(instance-precondition--assert-language--reference-sh)
-	[ $(instance-param-language-exists) != $(system-sym-true) ] 	\
-		|| $(call system-print-message-sh, INFO, The specified language '$(instance-param--$(instance-task-title)--language)' is already defined for this PostgreSQL server instance.)
-	[ $(instance-param-language-exists) == $(system-sym-true) ] 	\
- 		||  $(call instance-psql-create-language, $(instance-task--$(instance-task-title)--language))
+	$(instance-task--create-language--psql-sh)
 
 endef
 
@@ -391,42 +416,107 @@ endef
 # -------------------------------------------------------------------------------------------
 instance-task--create-role--description						=	Create a role (database user account) within a running PostgreSQL server instance.
 instance-task--create-role--require							=	instance-param-title=INSTANCE-ROLE
+instance-task--create-role--role							=	$(instance-param-argument2)
+instance-task--create-role--password						=	$(shell $(system-cmd-echo) $(instance-task--create-role--role) | $(system-cmd-tr) [a-z] [A-Z] )
+instance-task--create-role--psql-sh							=	$(call instance-psql-internal-sh, create role $(instance-task--create-role--role) with nosuperuser nocreatedb nocreaterole noinherit encrypted password '$(instance-task--create-role--password)')
+define instance-task--create-role--sh
+	$(instance-task--create-role--psql-sh)
+
+endef
 
 instance-task--drop-role--description						=	Delete a role (database user account) from a running PostgreSQL server instance.
 instance-task--drop-role--require							=	instance-param-title=INSTANCE-ROLE
+define instance-task--drop-role--sh
+	$(system-print-error-not-implemented-sh)
+
+
+endef
 
 instance-task--list-role--description						=	List all roles (database user accounts) in a running PostgreSQL server instance.
 instance-task--list-role--require							=	instance-param-title=INSTANCE
+define instance-task--list-role--sh
+	$(system-print-error-not-implemented-sh)
+
+
+endef
 
 # -------------------------------------------------------------------------------------------
 instance-task--create-tablespace--description				=	Create a tablespace within a running PostgreSQL server instance.
 instance-task--create-tablespace--require					=	instance-param-title=INSTANCE-ROLE-TABLESPACE
+instance-task--create-tablespace--role						=	$(instance-param-argument2)
+instance-task--create-tablespace--tablespace				=	$(instance-param-argument3)
+instance-task--create-tablespace--location					=	$(instance-dir)/tablespace-$(instance-task--create-tablespace--tablespace)
+instance-task--create-tablespace--psql-sh					=	$(call instance-psql-internal-sh, create tablespace $(instance-task--create-tablespace--tablespace) owner $(instance-task--create-tablespace--role) location  '$(instance-task--create-tablespace--location)'  )
+define instance-task--create-tablespace--sh
+	[ ! -d '$(instance-task--create-tablespace--location)' ] && $(system-cmd-mkdir) -p $(instance-task--create-tablespace--location)
+	$(system-cmd-chown) $(project-service-login-name):$(project-service-group-name) $(instance-task--create-tablespace--location)
+	$(instance-task--create-tablespace--psql-sh)
+
+endef
+
+
 
 instance-task--drop-tablespace--description					=	Delete a tablespace from a running PostgreSQL server instance.
 instance-task--drop-tablespace--require						=	instance-param-title=INSTANCE-TABLESPACE
+define instance-task--drop-tablespace--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 instance-task--list-tablespace--description					=	List all tablespaces in a running PostgreSQL server instance.
 instance-task--list-tablespace--require						=	instance-param-title=INSTANCE
+define instance-task--list-tablespace--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 # -------------------------------------------------------------------------------------------
 instance-task--create-database--description					=	Create a database within a running PostgreSQL server instance.
 instance-task--create-database--require						=	instance-param-title=INSTANCE-ROLE-TABLESPACE-DATABASE
+instance-task--create-database--role						=	$(instance-param-argument2)
+instance-task--create-database--tablespace					=	$(instance-param-argument3)
+instance-task--create-database--database					=	$(instance-param-argument4)
+instance-task--create-database--psql-sh						=	$(call instance-psql-internal-sh, create database $(instance-task--create-database--database) owner $(instance-task--create-database--role) tablespace  $(instance-task--create-database--tablespace)  )
+define instance-task--create-database--sh
+	$(instance-task--create-database--psql-sh)
+
+endef
 
 instance-task--drop-database--description					=	Delete a database from a running PostgreSQL server instance.
 instance-task--drop-database--require						=	instance-param-title=INSTANCE-DATABASE
+define instance-task--drop-database--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 instance-task--list-database--description					=	List all databases in a running PostgreSQL server instance.
 instance-task--list-database--require						=	instance-param-title=INSTANCE
+define instance-task--list-database--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 # -------------------------------------------------------------------------------------------
 instance-task--create-schema--description					=	Create a schema within a running PostgreSQL server instance.
 instance-task--create-schema--require						=	instance-param-title=INSTANCE-ROLE-DATABASE-SCHEMA
+define instance-task--create-schema--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 instance-task--drop-schema--description						=	Delete a schema from a running PostgreSQL server instance.
 instance-task--drop-schema--require							=	instance-param-title=INSTANCE-SCHEMA
+define instance-task--drop-schema--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 instance-task--list-schema--description						=	List all schema in a running PostgreSQL server instance.
 instance-task--list-schema--require							=	instance-param-title=INSTANCE
+define instance-task--list-schema--sh
+	$(system-print-error-not-implemented-sh)
+
+endef
 
 # -------------------------------------------------------------------------------------------
 

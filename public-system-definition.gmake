@@ -108,6 +108,13 @@ system-print-error-sh				=	(	$(system-cmd-printf)								\
 												"$(func-print-error-body-text)"					\
 												&& exit $(func-print-error-code) )
 
+func-print-variable-name			=	$(strip $(1))
+system-print-variable-sh				=	$(system-cmd-printf)										\
+											"%-$(system-print-message-header-width)s %-50s = '%s'\\n" 	\
+											"VARIABLE:" 												\
+											"$(func-print-variable-name)" "$($(func-print-variable-name))"
+
+
 
 system-print-error-not-implemented-sh		=	$(call system-print-error-sh, $(system-error-code-not-implemented), The task '$(instance-task-title)' has not yet been implemented.  Sorry.)
 

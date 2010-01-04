@@ -8,13 +8,22 @@ h1.  Requirements
 The following are required to be pre-installed on the host machine (server) :
 
 *  PostgreSQL server package
-*  GNU/make (gmake) executable
+*  GNU/make (gmake) executable:  The scripts assume that this utility is available at as @/usr/bin/gmake@ which presumably is its standard location on most Linux distributions.
 *  PSql client (optional)
+*  @chkconfig@ (optional, for RPM based systems like Fedora only, for registration/deregistration of boot/init scripts)
+*  Common Linux packages - @grep@, @sed@
 
+h1.  Preparing your system for @libernix-postgres-multiserver@:
 
-h1.  Configuration
+The following steps illustrate how you could configure your system for running multiple instances of PostgreSQL server.  
 
-As the @root@ user on a Linux/Unix machine, perform the following steps as root user (unless another user account is specified) :
+Execute all the command line operations as @root@ user on a Linux/Unix machine, unless otherwise specified.
+
+h4.  Make sure you have all the necessary prequisites already installed on your system.  The following example illustrates how to do so on a Fedora Linux machine:
+
+<pre>
+#   yum install postgresql postgresql-server make grep sed which chkconfig
+</pre>
 
 h4.  Choose a base directory
 
@@ -30,50 +39,373 @@ Execute the following commands as root:
 #  cd libernix-postgres-multiserver
 </pre>
 
-h4.  Copy the file @public-user-definition.gmake.example@ to @public-user-definition.gmake@ :
+h1.  Quick Smoke test:
+
+If you choose to to a quick smoke test, you could execute the following in the @libernix-postgres-multiserver@ directory:
+
+<pre>
+#  cd libernix-postgres-multiserver
+#  gmake -srRf public-project-test.gmake test-recycle-service
+</pre>
+
+The above command would (re)create the default @development@ instance and also launch it at port 54321.  If the test command returns any errors, you probably have some configuration issues.
+
+h4.  Delete the Smoke test instance:
+
+If the smoke test above succeeded, you would need to delete the @development@ instance it would have created for the purpose, before proceeding to the detailed step-by-step configuration (mentioned furuther down below):
+
+<pre>
+#  gmake -srRf public-project-test.gmake test-recycle-service
+</pre>
+
+
+h1.  Step-by-step Configuration:
+
+h4.  Copy the file @public-user-definition.gmake.example@ to @private-user-definition.gmake@ :
 
 <pre>
 #  cp public-user-definition.gmake.example private-user-definition.gmake 
 </pre>
 
-The default configuration contains descriptions for 2 named server instances @production@ and @development@.  You could choose to define as many others as you like following the examples therein.  Note that just defining another server instance does not automatically create that instance.  You would need to manually create that instance for it to be useful (this is just a one time operation).  The main  script you would exercise with the @/usr/bin/gmake@ command is @public-project-main.gmake@.
+Note that the Smoke Test above might have done this already for you, in which case you would be ready to proceed further.
+
+The default user configuration file contains descriptions for 2 named server instances @production@ and @development@.  You could choose to define as many others as you like following the examples therein.  Note that just defining another server instance does not automatically create that instance.  You would need to manually create that instance for it to be useful (that would usually be just a one time operation).  The main  command you would exercise for this purpose is the  @/usr/bin/gmake@ command.  The project's main script  is @public-project-main.gmake@.
 
 h4.  Look at the help for the project
 
 <pre>
-#  gmake -srRf public-project-main.gmake help
+#   gmake -srRf  public-project-main.gmake help 
 </pre>
 
 The output would print a long list of available actions that you could choose to perform, their dependencies (if any), and any extra command line arguments as may be required.
 
-Let us initialize the @development@ instance first.
-
-h4. Inspect the @development@ instance as follows:
-
 <pre>
-#   gmake -srRf public-project-main.gmake instance-title=development show-configuration
+TASK:         Executing 'help-system' ...                                          
+
+INFO:         The scripts in this project enables one to create multiple independent isolated instances of PostGreSQL server.
+INFO:         The various tasks that are available are described below.                                                      
+INFO:         Replace the words INSTANCE, TABLESPACE, DATABASE, SCHEMA and ROLE as appropriate.                              
+
+COMMAND:      /etc/init.d/postgres-development  help
+COMMAND:      /etc/init.d/postgres-development  help-system
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    help-system
+DESCRIPTION:  Show this message.                                           
+
+COMMAND:      /etc/init.d/postgres-development  debug
+COMMAND:      /etc/init.d/postgres-development  debug-system
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    debug-system
+DESCRIPTION:  Display debug information, e.g. system defined variables etc. 
+
+COMMAND:      /etc/init.d/postgres-development  start
+COMMAND:      /etc/init.d/postgres-development  start-service
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    start-service
+DESCRIPTION:  Start the specified instance of PostgreSQL server.             
+
+COMMAND:      /etc/init.d/postgres-development  stop
+COMMAND:      /etc/init.d/postgres-development  stop-service
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    stop-service
+DESCRIPTION:  Stop the specified instance of PostgreSQL server.             
+
+COMMAND:      /etc/init.d/postgres-development  restart
+COMMAND:      /etc/init.d/postgres-development  restart-service
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    restart-service
+DESCRIPTION:  Restart the specified instance of PostgreSQL server.             
+
+COMMAND:      /etc/init.d/postgres-development  condrestart
+COMMAND:      /etc/init.d/postgres-development  condrestart-service
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    condrestart-service
+DESCRIPTION:  Conditionally restart the specified instance of PostgreSQL server.   
+
+COMMAND:      /etc/init.d/postgres-development  status
+COMMAND:      /etc/init.d/postgres-development  status-service
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    status-service
+DESCRIPTION:  Display the status for the specified instance of PostgreSQL server.
+
+COMMAND:      /etc/init.d/postgres-development  reload
+COMMAND:      /etc/init.d/postgres-development  reload-service
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    reload-service
+DESCRIPTION:  Reload configuration for the specified instance of PostgreSQL server.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  create-instance
+DESCRIPTION:  Create an instance of PostgreSQL server with the specified instance name.                     
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  register-instance
+DESCRIPTION:  Register the PostgreSQL server instance with the operating system startup subsystem.            
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  unregister-instance
+DESCRIPTION:  Unregister the PostgreSQL server instance from the operating system startup subsystem.            
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake    list-instance
+DESCRIPTION:  List all the available PostgreSQL server instances.            
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  showconfig-instance
+DESCRIPTION:  Display the configuration for the specified instance.                                             
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-LANGUAGE  create-language
+DESCRIPTION:  Create a procedural language for the PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-LANGUAGE  drop-language
+DESCRIPTION:  Delete the specified procedural langugage from the PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  list-language
+DESCRIPTION:  List all the installed procedural langugages in the PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-ROLE  create-role
+DESCRIPTION:  Create a role (database user account) within a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-ROLE  drop-role
+DESCRIPTION:  Delete a role (database user account) from a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  list-role
+DESCRIPTION:  List all roles (database user accounts) in a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-ROLE-TABLESPACE  create-tablespace
+DESCRIPTION:  Create a tablespace within a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-TABLESPACE  drop-tablespace
+DESCRIPTION:  Delete a tablespace from a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  list-tablespace
+DESCRIPTION:  List all tablespaces in a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-ROLE-TABLESPACE-DATABASE  create-database
+DESCRIPTION:  Create a database within a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-DATABASE  drop-database
+DESCRIPTION:  Delete a database from a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  list-database
+DESCRIPTION:  List all databases in a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-ROLE-DATABASE-SCHEMA  create-schema
+DESCRIPTION:  Create a schema within a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE-SCHEMA  drop-schema
+DESCRIPTION:  Delete a schema from a running PostgreSQL server instance.
+
+COMMAND:      /usr/bin/gmake -srRf public-project-main.gmake  instance-param-title=INSTANCE  list-schema
+DESCRIPTION:  List all schema in a running PostgreSQL server instance.
+
 </pre>
 
-If you are satisfied with the configuration parameters, then proceed further, else edit the @private-user-definition.gmake@ file and repeat above action.
+
+Let us initialize the @development@ instance first.
+
+h4. Inspect the configuration parameters for @development@ instance as follows:
+
+<pre>
+#   gmake -srRf  public-project-main.gmake instance-param-title=development   showconfig-instance
+</pre>
+
+Output:
+
+<pre>
+INFO:         The system would use the following information for administering this instance:                                   
+VARIABLE:    project-dir                                        = '/mnt/sdb4/libernix-postgres-multiserver'                     
+VARIABLE:    instance-param-title                               = 'development'                                                 
+VARIABLE:    instance-param-name                                = 'development'                                                 
+VARIABLE:    instance-dir                                       = '/mnt/sdb4/libernix-postgres-multiserver/instance-development'
+VARIABLE:    user-instance--development--port                   = '54321'                                                       
+VARIABLE:    user-instance--development--admin-password         = 'DEVELOPMENT'                                                 
+
+
+</pre>
+
+
+If you are satisfied with the configuration parameters, then proceed further, else edit the @private-user-definition.gmake@ file and repeat above @gmake@ task.
 
 h4.  Create the instance
 
 <pre>
-#   gmake -srRf public-project-main.gmake instance-title=development create-instance
+#   gmake -srRf  public-project-main.gmake instance-param-title=development   create-instance
 </pre>
+
 
 This action would create an instance called @development@ along with the following filesystem components:
 * *Data:*  The instance data (tablespaces, configuration files etc.) would be located under @libernix-postgres-multiserver/data/development/@ directory.
 * *Log:*  The log files would be located under @libernix-postgres-multiserver/log/development/@ directory. The notable file at this point would be the creation log @development--create-instance.log@.
 *  *Configuration:*  The configuration files @postgresql.conf@, @pg_hba.conf@ and @pg_ident.conf@ would all be located under @libernix-postgres-multiserver/data/development/conf/@ directory.
 
-h4.  Start the instance
+The output of @create-instance@ task would be as follows:
 
 <pre>
-#   gmake -srRf public-project-main.gmake instance-title=development start-instance
+TASK:         Executing '/mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL/PG_VERSION' ...
+
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale en_US.UTF-8.
+The default database encoding has accordingly been set to UTF8.
+The default text search configuration will be set to "english".
+
+fixing permissions on existing directory /mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL ... ok
+creating subdirectories ... ok
+selecting default max_connections ... 100
+selecting default shared_buffers ... 24MB
+creating configuration files ... ok
+creating template1 database in /mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL/base/1 ... ok
+initializing pg_authid ... ok
+setting password ... ok
+initializing dependencies ... ok
+creating system views ... ok
+loading system objects' descriptions ... ok
+creating conversions ... ok
+creating dictionaries ... ok
+setting privileges on built-in objects ... ok
+creating information schema ... ok
+vacuuming database template1 ... ok
+copying template1 to template0 ... ok
+copying template1 to postgres ... ok
+
+Success. You can now start the database server using:
+
+    /usr/bin/postgres -D /mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL
+or
+    /usr/bin/pg_ctl -D /mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL -l logfile start
+
+INFO:  Created instance 'development' at location '/mnt/sdb4/libernix-postgres-multiserver/instance-development'.
+
+INFO:  Updated '/mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL/postgresql.conf'.
+
+INFO:  Updated '/mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL/pg_hba.conf'.
+
+INFO:  Updated '/mnt/sdb4/libernix-postgres-multiserver/instance-development/tablespace-GLOBAL/pg_ident.conf'.
 </pre>
 
 
+h4.  Start the server instance
+
+Launch the instance as follows:
+
+<pre>
+#   gmake -srRf  public-project-main.gmake instance-param-title=development   start-service
+</pre>
+
+Output:
+
+<pre>
+TASK:         Executing 'start-service' ...
+waiting for server to start.... done
+server started
+</pre>
+
+h4.  Stop the server instance
+
+Shut down the instance as follows:
+
+<pre>
+#   gmake -srRf  public-project-main.gmake instance-param-title=development   start-service
+</pre>
+
+Output:
+
+<pre>
+TASK:         Executing 'stop-service' ...
+waiting for server to shut down.... done
+server stopped
+</pre>
+
+h4.  If you want this service to be started on bootup, you could register the service as follows:
+
+<ore>
+#   gmake -srRf  public-project-main.gmake instance-param-title=development   register-instance
+</pre>
+
+Output:
+
+<pre>
+lrwxrwxrwx 1 root root 65 2009-12-31 17:30 /etc/init.d/postgres-development -> /mnt/sdb4/libernix-postgres-multiserver/public-project-main.gmake
+postgres-development    0:off   1:off   2:on    3:on    4:on    5:on    6:off
+
+</pre>
+
+
+h4.  Note that once a service instance is registered with the system startup process, you could execute the simplified commands using the symbolic link from the @/etc/init.d/ folder.  For example, to start the registered service instance, simply execute:
+
+<pre>
+#   /etc/init.d/postgres-development start
+</pre>
+
+Output: 
+
+<pre>
+TASK:         Executing 'start-service' ...
+waiting for server to start.... done
+server started
+
+</pre>
+
+The same is true for other @service@ commands like @start@, @stop@, @restart@, @reload@, @status@ etc.
+
+
+h4.  You could unregister the service from the operating system's startup process as follows:
+
+<ore>
+#   gmake -srRf  public-project-main.gmake instance-param-title=development   unregister-instance
+</pre>
+
+h4.  Create a database role:
+
+If the service instance is running (see the @start@ command above), you could create a new database role like @redmine@ as follows:
+
+<pre>
+#	 gmake -srRf  public-project-main.gmake instance-param-title=development-redmine create-role
+
+</pre>
+
+Output:
+<pre>
+EXECUTING command 'create-role' ....
+CREATE ROLE
+
+</pre>
+
+Note that by default, the password for the role is the same as the specified role, but capitalized.  So for the above example of role = @redmine@, the password would be @REDMINE@.
+
+h4.  Create the @plpgsql@ language:
+
+Command:
+
+<pre>
+#   gmake -srRf  public-project-main.gmake instance-param-title=development-plpgsql create-language
+
+</pre>
+
+<pre>
+EXECUTING task 'create-language'  ....
+CREATE LANGUAGE
+</pre>
+
+h4.  Create a tablespace:
+
+To create a tablespace called @redminets@ that is to be owned by role @redmine@, proceed as follows:
+
+<pre>
+  # gmake -srRf  public-project-main.gmake instance-param-title=development-redmine-redminets create-tablespace
+</pre>
+
+Output:
+<pre>
+EXECUTING command 'create-tablespace'  ....
+CREATE TABLESPACE
+</pre>
+
+Note that the role @redmine@ must exist prior to creating the tablespace.
+
+h4.  Create a database:
+
+To create a database called @redminedb@ within the server instance @development@, owned by user @redmine@, inside tablespace @redminets@, execute the following:
+Command:
+<pre>
+#  gmake -srRf  public-project-main.gmake instance-param-title=development-redmine-redminets-redminedb create-database
+</pre>
+
+Output
+<pre>
+EXECUTING command 'create-database' ....
+CREATE DATABASE
+
+</pre>
 
 
 

@@ -154,6 +154,7 @@ $(call instance-task-qualified1-wlist, role)  :
 	$(instance-precondition--assert-instance-referend--sh)
 	$(instance-precondition--assert-instance--running-sh)
 	$(instance-precondition--assert-role-reference--sh)
+	$(instance-task--$(instance-task-title)--sh)
 
 endif
 
@@ -161,12 +162,13 @@ endif
 # Define all the qualified tablespace tasks ...
 ifneq ($(call instance-task-qualified1-wlist, tablespace),)
 $(call instance-task-qualified1-wlist, tablespace)  :	
-	$(system-cmd-echo) "EXECUTING command '$(@)' ...."
+	$(system-cmd-echo) "EXECUTING command '$(@)'  ...."
 	$(instance-precondition--assert-instance-reference--sh)
 	$(instance-precondition--assert-instance-referend--sh)
 	$(instance-precondition--assert-role-reference--sh)
 	$(instance-precondition--assert-role-referend--sh)
 	$(instance-precondition--assert-tablespace-reference--sh)
+	$(instance-task--$(instance-task-title)--sh)
 
 endif
 
@@ -182,6 +184,7 @@ $(call instance-task-qualified1-wlist, database)  :
 	$(instance-precondition--assert-tablespace-reference--sh)
 	$(instance-precondition--assert-tablespace-referend--sh)
 	$(instance-precondition--assert-database-reference--sh)
+	$(instance-task--$(instance-task-title)--sh)
 
 endif
 
@@ -197,6 +200,7 @@ $(call instance-task-qualified1-wlist, schema)  :
 	$(instance-precondition--assert-database-reference--sh)
 	$(instance-precondition--assert-database-referend--sh)
 	$(instance-precondition--assert-schema-reference--sh)
+	$(instance-task--$(instance-task-title)--sh)
 
 endif
 
